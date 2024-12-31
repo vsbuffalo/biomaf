@@ -2,6 +2,7 @@
 use csv::{Writer, WriterBuilder};
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
+use std::path::Path;
 use thiserror::Error;
 use tracing::info;
 
@@ -98,10 +99,18 @@ pub struct AlignmentStatistics {
 }
 
 impl AlignmentStatistics {
-    pub fn new(output: OutputFile, species: HashSet<String>) -> Result<Self, StatsError> {
-        let writer = WriterBuilder::new()
-            .delimiter(b'\t')
-            .from_writer(output.writer()?);
+    pub fn new(output: Option<&Path>, species: HashSet<String>) -> Result<Self, StatsError> {
+        let writer: csv::Writer<Box<dyn std::io::Write>> = match output {
+            Some(output_file) => {
+                let output_file = OutputFile::new(output_file);
+                WriterBuilder::new()
+                    .delimiter(b'\t')
+                    .from_writer(Box::new(output_file.writer()?))
+            }
+            None => WriterBuilder::new()
+                .delimiter(b'\t')
+                .from_writer(Box::new(std::io::stdout())),
+        };
 
         let mut stats = Self { writer, species };
         stats.write_header()?;
@@ -537,7 +546,7 @@ mod tests {
         let stats = block
             .calc_stats(None, None, Some(&species_indices))
             .unwrap();
-        dbg!(&stats);
+        // dbg!(&stats);
 
         let pair_stats = stats.pairwise_stats.get(&(0, 1)).unwrap();
         assert_eq!(pair_stats.substitutions, 1);
@@ -551,7 +560,7 @@ mod tests {
     fn test_gap_rate_calculation() {
         #[rustfmt::skip]
         let block = create_test_block("A--TC--G", 
-                                      "AT-TC-GG");
+            "AT-TC-GG");
         let species_indices: HashSet<u32> = vec![0, 1].into_iter().collect();
         let stats =
             calc_alignment_block_statistics(&block, Some(&species_indices), None, None).unwrap();

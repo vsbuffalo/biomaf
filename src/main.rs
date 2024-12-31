@@ -44,6 +44,17 @@ enum Commands {
         #[arg(short, long, default_value = "0")]
         min_length: u64,
     },
+    /// Extract MAF coordinates to TSV (used for development/debugging).
+    Tsv {
+        /// Input MAF file, or multiple MAF files with glob (e.g. "mafs/chr*.maf")
+        /// Files can be gzipped.
+        #[arg(value_name = "input.maf")]
+        input: PathBuf,
+
+        /// The chromosome name for this MAF file.
+        #[arg(long)]
+        chrom: String,
+    },
     /// Convert MAF to binary format with index
     Binary {
         /// Input MAF file, or multiple MAF files with glob (e.g. "mafs/chr*.maf")
@@ -114,7 +125,7 @@ enum Commands {
 
         /// Output TSV file
         #[arg(short, long, value_name = "output.tsv.gz")]
-        output: PathBuf,
+        output: Option<PathBuf>,
 
         /// Comma-separated list of species.
         #[arg(short, long, value_name = "hg38,panTro4,ponAbe2")]
@@ -222,6 +233,26 @@ struct ProcessStats {
     filtered_blocks: u64,
 }
 
+fn convert_to_tsv(input: &Path, chrom: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut maf = MafReader::from_file(input)?;
+    // let header = maf.read_header()?.clone();
+
+    // let mut processed_blocks = 0;
+
+    while let Some(block) = maf.next_block()? {
+        // processed_blocks += 1;
+        let ref_align = &block.sequences[0];
+        println!(
+            "{}\t{}\t{}",
+            chrom,
+            ref_align.start,
+            ref_align.start + ref_align.size
+        )
+    }
+
+    Ok(())
+}
+
 fn split_maf(
     input: &Path,
     output_dir: &Path,
@@ -302,6 +333,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     match cli.command {
+        Commands::Tsv { input, chrom } => convert_to_tsv(input.as_path(), &chrom)?,
         Commands::Binary {
             input,
             output_dir,
@@ -401,7 +433,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             data_dir,
         } => {
             let species = HashSet::from_iter(species.split(',').map(String::from));
-            stats_command(&regions, &output, species, &data_dir)?
+            stats_command(&regions, output.as_deref(), species, &data_dir)?
         }
         Commands::DebugIndex { path } => {
             let _index = BinningIndex::<SpeciesDictionary>::open(&path)?;

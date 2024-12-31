@@ -492,7 +492,7 @@ fn estimate_record_count(path: &Path) -> Result<u64, Box<dyn std::error::Error>>
 
 pub fn stats_command(
     regions: &Path,
-    output: &Path,
+    output: Option<&Path>,
     species: HashSet<String>,
     data_dir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -508,8 +508,7 @@ pub fn stats_command(
     // Setup input/output
     let input_file = InputFile::new(regions);
     let buf_reader = input_file.reader()?;
-    let output_file = OutputFile::new(output);
-    let mut stats_writer = AlignmentStatistics::new(output_file, species.clone())?;
+    let mut stats_writer = AlignmentStatistics::new(output, species.clone())?;
 
     // Create CSV reader for BED file
     let mut reader = ReaderBuilder::new()
@@ -564,6 +563,7 @@ pub fn stats_command(
     info!("Total elapsed {:?}", total_time.elapsed());
     Ok(())
 }
+
 pub fn convert_to_binary_glob(
     input_pattern: &str,
     output_dir: &Path,
